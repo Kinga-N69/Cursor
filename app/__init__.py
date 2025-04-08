@@ -3,8 +3,13 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 import os
 from dotenv import load_dotenv
+import requests
 
 load_dotenv()
+
+TMDB_API_KEY = os.getenv('TMDB_API_KEY', '')
+GOOGLE_BOOKS_API_KEY = os.getenv('GOOGLE_BOOKS_API_KEY', '')
+RAWG_API_KEY = os.getenv('RAWG_API_KEY', '')
 
 app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
 CORS(app)
@@ -136,4 +141,121 @@ def add_favorite():
     except Exception as e:
         db.session.rollback()
         app.logger.error(f'Error adding favorite: {str(e)}')
-        return jsonify({'error': 'Could not add favorite'}), 500 
+        return jsonify({'error': 'Could not add favorite'}), 500
+
+@app.route('/api/favorites/<int:item_id>', methods=['PUT'])
+def update_favorite(item_id):
+    try:
+        data = request.json
+        app.logger.info(f'Updating item {item_id} with data: {data}')  # Debug log
+        
+        item = FavoriteItem.query.get_or_404(item_id)
+        
+        # Aktualizacja wszystkich dozwolonych pól
+        allowed_fields = ['title', 'type', 'description', 'external_id', 
+                         'poster_path', 'status', 'rating', 'notes']
+        
+        for field in allowed_fields:
+            if field in data:
+                setattr(item, field, data[field])
+            
+        db.session.commit()
+        
+        return jsonify({
+            'id': item.id,
+            'title': item.title,
+            'type': item.type,
+            'description': item.description,
+            'external_id': item.external_id,
+            'poster_path': item.poster_path,
+            'rating': item.rating,
+            'status': item.status,
+            'notes': item.notes
+        })
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'Error updating favorite: {str(e)}')
+        return jsonify({'error': 'Could not update favorite'}), 500
+
+@app.route('/api/favorites/<int:item_id>', methods=['DELETE'])
+def delete_favorite(item_id):
+    try:
+        item = FavoriteItem.query.get_or_404(item_id)
+        db.session.delete(item)
+        db.session.commit()
+        return '', 204
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'Error deleting favorite: {str(e)}')
+        return jsonify({'error': 'Could not delete favorite'}), 500
+
+@app.route('/api/search', methods=['GET'])
+def search():
+    try:
+        query = request.args.get('query', '')
+        search_type = request.args.get('type', 'all')  # all, movie, book, game
+        results = []
+
+        # Wyszukiwanie filmów przez TMDB API
+        if search_type in ['all', 'movie']:
+            tmdb_url = f'https://api.themoviedb.org/3/search/movie'
+            response = requests.get(tmdb_url, params={
+                'api_key': TMDB_API_KEY,
+                'query': query,
+                'language': 'pl-PL'
+            })
+            if response.status_code == 200:
+                for item in response.json().get('results', [])[:5]:
+                    results.append({
+                        'id': f"movie_{item['id']}",
+                        'title': item['title'],
+                        'type': 'movie',
+                        'description': item['overview'],
+                        'poster_path': f"https://image.tmdb.org/t/p/w500{item['poster_path']}" if item.get('poster_path') else None,
+                        'rating': item['vote_average']
+                    })
+
+        # Wyszukiwanie książek przez Google Books API
+        if search_type in ['all', 'book']:
+            books_url = 'https://www.googleapis.com/books/v1/volumes'
+            response = requests.get(books_url, params={
+                'q': query,
+                'key': GOOGLE_BOOKS_API_KEY,
+                'langRestrict': 'pl',
+                'maxResults': 5
+            })
+            if response.status_code == 200:
+                for item in response.json().get('items', []):
+                    volume_info = item.get('volumeInfo', {})
+                    results.append({
+                        'id': f"book_{item['id']}",
+                        'title': volume_info.get('title', ''),
+                        'type': 'book',
+                        'description': volume_info.get('description', ''),
+                        'poster_path': volume_info.get('imageLinks', {}).get('thumbnail'),
+                        'rating': volume_info.get('averageRating', 0)
+                    })
+
+        # Wyszukiwanie gier przez RAWG API
+        if search_type in ['all', 'game']:
+            rawg_url = 'https://api.rawg.io/api/games'
+            response = requests.get(rawg_url, params={
+                'key': RAWG_API_KEY,
+                'search': query,
+                'page_size': 5
+            })
+            if response.status_code == 200:
+                for item in response.json().get('results', []):
+                    results.append({
+                        'id': f"game_{item['id']}",
+                        'title': item['name'],
+                        'type': 'game',
+                        'description': item.get('description', ''),
+                        'poster_path': item.get('background_image'),
+                        'rating': item.get('rating', 0)
+                    })
+
+        return jsonify({'results': results})
+    except Exception as e:
+        app.logger.error(f'Error searching: {str(e)}')
+        return jsonify({'error': 'Could not perform search'}), 500 
