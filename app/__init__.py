@@ -113,10 +113,11 @@ def get_favorites():
             'title': item.title,
             'type': item.type,
             'description': item.description,
-            'rating': item.rating,
+            'rating': round(item.rating * 2) / 2 if item.rating is not None else None,
             'status': item.status,
             'notes': item.notes,
-            'poster_path': item.poster_path
+            'poster_path': item.poster_path,
+            'external_id': item.external_id
         } for item in items])
     except Exception as e:
         app.logger.error(f'Error getting favorites: {str(e)}')
@@ -126,19 +127,46 @@ def get_favorites():
 def add_favorite():
     try:
         data = request.json
+        app.logger.info(f'Attempting to add favorite: {data}')
+        
+        # Sprawdź czy element już istnieje
+        existing_item = FavoriteItem.query.filter_by(
+            external_id=str(data.get('external_id')),
+            type=data.get('type')
+        ).first()
+        
+        if existing_item:
+            app.logger.info(f'Item already exists: {existing_item.id}')
+            return jsonify({
+                'error': 'Item already exists',
+                'item': {
+                    'id': existing_item.id,
+                    'title': existing_item.title,
+                    'type': existing_item.type,
+                    'description': existing_item.description,
+                    'external_id': existing_item.external_id,
+                    'poster_path': existing_item.poster_path,
+                    'rating': existing_item.rating,
+                    'status': existing_item.status,
+                    'notes': existing_item.notes
+                }
+            }), 409  # Conflict status code
+        
         new_item = FavoriteItem(**data)
         db.session.add(new_item)
         db.session.commit()
+        
         return jsonify({
             'id': new_item.id,
             'title': new_item.title,
             'type': new_item.type,
             'description': new_item.description,
+            'external_id': new_item.external_id,
+            'poster_path': new_item.poster_path,
             'rating': new_item.rating,
             'status': new_item.status,
-            'notes': new_item.notes,
-            'poster_path': new_item.poster_path
-        })
+            'notes': new_item.notes
+        }), 201  # Created status code
     except Exception as e:
         db.session.rollback()
         app.logger.error(f'Error adding favorite: {str(e)}')

@@ -23,15 +23,38 @@ export const useFavoritesStore = defineStore('favorites', {
     },
 
     async addFavorite(item) {
-      this.loading = true
+      // Sprawdź czy element już istnieje
+      const exists = this.items.some(
+        existing => 
+          String(existing.external_id) === String(item.external_id) && 
+          existing.type === item.type
+      );
+
+      if (exists) {
+        console.log('Item already exists in store:', item);
+        return { error: 'Item already exists' };
+      }
+
+      this.loading = true;
       try {
-        const response = await axios.post('/api/favorites', item)
-        this.items.push(response.data)
-        this.error = null
+        console.log('Adding item:', item);
+        const response = await axios.post('/api/favorites', item);
+        
+        // Sprawdź czy otrzymaliśmy błąd o duplikacie
+        if (response.status === 409) {
+          console.log('Server reported duplicate item');
+          return { error: 'Item already exists' };
+        }
+        
+        this.items.push(response.data);
+        this.error = null;
+        return { success: true, data: response.data };
       } catch (error) {
-        this.error = error.message
+        console.error('Error adding favorite:', error);
+        this.error = error.message;
+        return { error: error.message };
       } finally {
-        this.loading = false
+        this.loading = false;
       }
     },
 

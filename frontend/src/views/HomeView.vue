@@ -52,11 +52,17 @@
               <p class="description">{{ item.description || 'Brak opisu' }}</p>
               <button 
                 @click="addToFavorites(item)"
-                :disabled="loading"
+                :disabled="isAddingToFavorites[item.id] || isInFavorites(item)"
+                :class="{ 
+                  'success': addedToFavorites[item.id],
+                  'in-favorites': isInFavorites(item)
+                }"
                 class="add-button"
               >
-                <span class="material-icons">favorite_border</span>
-                Dodaj do ulubionych
+                <span class="material-icons">
+                  {{ isInFavorites(item) ? 'favorite' : (addedToFavorites[item.id] ? 'check_circle' : 'favorite_border') }}
+                </span>
+                {{ getAddButtonLabel(item) }}
               </button>
             </div>
           </div>
@@ -189,17 +195,17 @@ button:disabled {
 }
 
 .item-card {
-  border: 1px solid #ddd;
+  border: 2px solid #333;
   border-radius: 12px;
   overflow: hidden;
-  background: white;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background: #2a2a2a;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
   transition: transform 0.2s;
 }
 
 .item-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.3);
 }
 
 .item-card img {
@@ -212,7 +218,14 @@ button:disabled {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
+  color: #ffffff;
+}
+
+.item-details h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #ffffff;
 }
 
 .item-type {
@@ -243,7 +256,7 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  color: #666;
+  color: #ffffff;
 }
 
 .star {
@@ -252,23 +265,46 @@ button:disabled {
 
 .description {
   font-size: 0.9rem;
-  color: #666;
+  color: #ffffff;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  opacity: 0.8;
 }
 
 .add-button {
   margin-top: auto;
   width: 100%;
   justify-content: center;
+  background-color: #42b883;
+  transition: all 0.3s ease;
+}
+
+.add-button.success {
+  background-color: #4caf50;
+}
+
+.add-button:disabled {
+  background-color: #2a2a2a;
+  border: 2px solid #333;
+  color: #666;
+}
+
+.add-button.in-favorites {
+  background-color: #666;
+  cursor: default;
+}
+
+.add-button.in-favorites:hover {
+  transform: none;
+  background-color: #666;
 }
 
 .loading {
   text-align: center;
   padding: 2rem;
-  color: #666;
+  color: #ffffff;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -278,7 +314,7 @@ button:disabled {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
+  border: 4px solid #333;
   border-top: 4px solid #42b883;
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -298,12 +334,12 @@ button:disabled {
 .no-results {
   text-align: center;
   padding: 2rem;
-  color: #666;
+  color: #ffffff;
 }
 </style>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useFavoritesStore } from '../stores/favorites'
 import axios from 'axios'
 
@@ -313,6 +349,26 @@ const searchResults = ref([])
 const loading = ref(false)
 const error = ref(null)
 const favoritesStore = useFavoritesStore()
+const isAddingToFavorites = ref({})
+const addedToFavorites = ref({})
+
+// Pobierz ulubione przy montowaniu komponentu
+onMounted(() => {
+  favoritesStore.fetchFavorites()
+})
+
+function isInFavorites(item) {
+  console.log('Checking item:', item.id, typeof item.id);
+  console.log('Current favorites:', favoritesStore.items.map(f => ({ id: f.external_id, type: typeof f.external_id })));
+  
+  return favoritesStore.items.some(favorite => {
+    // Konwertuj oba ID do stringów dla pewności
+    const favoriteId = String(favorite.external_id);
+    const itemId = String(item.id);
+    console.log('Comparing:', favoriteId, itemId, favoriteId === itemId);
+    return favoriteId === itemId && favorite.type === item.type;
+  });
+}
 
 function getTypeLabel(type) {
   const labels = {
@@ -327,10 +383,24 @@ function handleImageError(e) {
   e.target.src = 'https://via.placeholder.com/300x450?text=Brak+obrazka'
 }
 
+function getAddButtonLabel(item) {
+  if (isInFavorites(item)) {
+    return 'Już w ulubionych'
+  }
+  if (isAddingToFavorites.value[item.id]) {
+    return 'Dodawanie...'
+  }
+  if (addedToFavorites.value[item.id]) {
+    return 'Dodano do ulubionych'
+  }
+  return 'Dodaj do ulubionych'
+}
+
 async function search() {
   if (!searchQuery.value) return
   
   loading.value = true
+  error.value = null
   try {
     const response = await axios.get('/api/search', {
       params: {
@@ -339,7 +409,9 @@ async function search() {
       }
     })
     searchResults.value = response.data.results
-    error.value = null
+    // Reset status dla nowych wyników
+    isAddingToFavorites.value = {}
+    addedToFavorites.value = {}
   } catch (err) {
     error.value = 'Wystąpił błąd podczas wyszukiwania'
     searchResults.value = []
@@ -349,15 +421,40 @@ async function search() {
 }
 
 async function addToFavorites(item) {
-  await favoritesStore.addFavorite({
-    title: item.title,
-    type: item.type,
-    description: item.description,
-    external_id: item.id,
-    poster_path: item.poster_path,
-    rating: item.rating || 0,
-    status: 'plan_to_watch',
-    notes: ''
-  })
+  // Sprawdź czy element już jest w ulubionych lub jest w trakcie dodawania
+  if (isInFavorites(item) || isAddingToFavorites.value[item.id]) {
+    return;
+  }
+
+  isAddingToFavorites.value[item.id] = true;
+  try {
+    const result = await favoritesStore.addFavorite({
+      title: item.title,
+      type: item.type,
+      description: item.description,
+      external_id: item.id,
+      poster_path: item.poster_path,
+      rating: item.rating || 0,
+      status: 'plan_to_watch',
+      notes: ''
+    });
+
+    if (result.error) {
+      console.log('Error adding to favorites:', result.error);
+      // Jeśli element już istnieje, oznacz go jako dodany
+      if (result.error === 'Item already exists') {
+        addedToFavorites.value[item.id] = true;
+      }
+    } else {
+      addedToFavorites.value[item.id] = true;
+      setTimeout(() => {
+        addedToFavorites.value[item.id] = false;
+      }, 3000);
+    }
+  } catch (err) {
+    console.error('Error adding to favorites:', err);
+  } finally {
+    isAddingToFavorites.value[item.id] = false;
+  }
 }
 </script> 
