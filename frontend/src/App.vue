@@ -5,8 +5,21 @@ import { RouterLink, RouterView } from 'vue-router'
 <template>
   <header>
     <nav>
-      <RouterLink to="/">Wyszukaj</RouterLink>
-      <RouterLink to="/favorites">Ulubione</RouterLink>
+      <div class="nav-content">
+        <router-link to="/" class="logo">
+          Moje Media
+        </router-link>
+        <div class="nav-links">
+          <router-link to="/" class="nav-link">
+            <span class="material-icons">search</span>
+            Wyszukaj
+          </router-link>
+          <router-link to="/favorites" class="nav-link">
+            <span class="material-icons">favorite</span>
+            Ulubione
+          </router-link>
+        </div>
+      </div>
     </nav>
   </header>
 
@@ -14,47 +27,69 @@ import { RouterLink, RouterView } from 'vue-router'
 </template>
 
 <style>
-@import '@mdi/font/css/materialdesignicons.css';
-
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background-color: #f5f5f5;
-}
-
-#app {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
-}
+@import '@/assets/base.css';
 
 header {
-  margin-bottom: 2rem;
+  background-color: #42b883;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
 }
 
 nav {
+  height: 64px;
+}
+
+.nav-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  color: white;
+  font-size: 1.5rem;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.nav-links {
   display: flex;
   gap: 1rem;
 }
 
-nav a {
-  color: #2c3e50;
+.nav-link {
+  color: white;
   text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   padding: 0.5rem 1rem;
   border-radius: 4px;
+  transition: background-color 0.2s;
 }
 
-nav a:hover {
-  background-color: #eee;
+.nav-link:hover {
+  background-color: rgba(255,255,255,0.1);
 }
 
-nav a.router-link-active {
-  background-color: #42b983;
-  color: white;
+.nav-link.router-link-active {
+  background-color: rgba(255,255,255,0.2);
 }
 
-h1 {
-  color: #2c3e50;
-  margin-bottom: 2rem;
+.material-icons {
+  font-size: 20px;
+}
+
+#app {
+  padding-top: 64px;
+  min-height: 100vh;
 }
 </style>
