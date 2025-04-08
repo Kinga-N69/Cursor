@@ -229,7 +229,11 @@ def search():
         try:
             tmdb_response = requests.get(
                 'https://api.themoviedb.org/3/search/movie',
-                params={'query': query, 'language': 'pl-PL'},
+                params={
+                    'query': query, 
+                    'language': 'pl-PL',
+                    'sort_by': 'popularity.desc'
+                },
                 headers={
                     'Authorization': f'Bearer {TMDB_ACCESS_TOKEN}',
                     'accept': 'application/json'
@@ -237,7 +241,14 @@ def search():
             )
             tmdb_data = tmdb_response.json()
             
-            for movie in tmdb_data.get('results', []):
+            # Sortuj wyniki według popularności
+            movies = sorted(
+                tmdb_data.get('results', []),
+                key=lambda x: (x.get('popularity', 0), x.get('vote_average', 0)),
+                reverse=True
+            )
+            
+            for movie in movies:
                 results.append({
                     'id': str(movie['id']),
                     'title': movie['title'],
