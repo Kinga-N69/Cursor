@@ -7,16 +7,17 @@ import { RouterLink, RouterView } from 'vue-router'
     <nav>
       <div class="nav-content">
         <router-link to="/" class="logo">
-          Moje Media
+          <span class="material-icons logo-icon">play_circle</span>
+          <span class="logo-text">Media</span>
         </router-link>
         <div class="nav-links">
           <router-link to="/" class="nav-link">
             <span class="material-icons">search</span>
-            Wyszukaj
+            <span class="link-text">Wyszukaj</span>
           </router-link>
           <router-link to="/favorites" class="nav-link">
             <span class="material-icons">favorite</span>
-            Ulubione
+            <span class="link-text">Ulubione</span>
           </router-link>
         </div>
       </div>
@@ -63,10 +64,27 @@ nav {
 }
 
 .logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   color: white;
-  font-size: 1.5rem;
-  font-weight: bold;
   text-decoration: none;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.logo:hover {
+  background-color: rgba(255,255,255,0.1);
+}
+
+.logo-icon {
+  font-size: 28px !important;
+}
+
+.logo-text {
+  font-size: 1.25rem;
+  font-weight: bold;
 }
 
 .nav-links {
@@ -104,5 +122,23 @@ nav {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+@media (max-width: 480px) {
+  .logo-text {
+    display: none;
+  }
+
+  .link-text {
+    display: none;
+  }
+
+  .nav-link {
+    padding: 0.5rem;
+  }
+
+  .nav-content {
+    padding: 0 0.5rem;
+  }
 }
 </style>
