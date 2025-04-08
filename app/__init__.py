@@ -8,6 +8,7 @@ import requests
 load_dotenv()
 
 TMDB_API_KEY = os.getenv('TMDB_API_KEY', '')
+TMDB_ACCESS_TOKEN = os.getenv('TMDB_ACCESS_TOKEN', '')
 GOOGLE_BOOKS_API_KEY = os.getenv('GOOGLE_BOOKS_API_KEY', '')
 RAWG_API_KEY = os.getenv('RAWG_API_KEY', '')
 
@@ -191,71 +192,83 @@ def delete_favorite(item_id):
 
 @app.route('/api/search', methods=['GET'])
 def search():
-    try:
-        query = request.args.get('query', '')
-        search_type = request.args.get('type', 'all')  # all, movie, book, game
-        results = []
+    query = request.args.get('query', '')
+    search_type = request.args.get('type', 'all')
+    results = []
 
-        # Wyszukiwanie filmów przez TMDB API
-        if search_type in ['all', 'movie']:
-            tmdb_url = f'https://api.themoviedb.org/3/search/movie'
-            response = requests.get(tmdb_url, params={
-                'api_key': TMDB_API_KEY,
-                'query': query,
-                'language': 'pl-PL'
-            })
-            if response.status_code == 200:
-                for item in response.json().get('results', [])[:5]:
-                    results.append({
-                        'id': f"movie_{item['id']}",
-                        'title': item['title'],
-                        'type': 'movie',
-                        'description': item['overview'],
-                        'poster_path': f"https://image.tmdb.org/t/p/w500{item['poster_path']}" if item.get('poster_path') else None,
-                        'rating': item['vote_average']
-                    })
+    if search_type in ['all', 'movie']:
+        # Wyszukiwanie filmów w TMDB
+        try:
+            tmdb_response = requests.get(
+                'https://api.themoviedb.org/3/search/movie',
+                params={'query': query, 'language': 'pl-PL'},
+                headers={
+                    'Authorization': f'Bearer {TMDB_ACCESS_TOKEN}',
+                    'accept': 'application/json'
+                }
+            )
+            tmdb_data = tmdb_response.json()
+            
+            for movie in tmdb_data.get('results', []):
+                results.append({
+                    'id': str(movie['id']),
+                    'title': movie['title'],
+                    'type': 'movie',
+                    'description': movie['overview'],
+                    'poster_path': f"https://image.tmdb.org/t/p/w500{movie['poster_path']}" if movie.get('poster_path') else None,
+                    'rating': movie['vote_average']
+                })
+        except Exception as e:
+            app.logger.error(f'TMDB API error: {str(e)}')
 
-        # Wyszukiwanie książek przez Google Books API
-        if search_type in ['all', 'book']:
-            books_url = 'https://www.googleapis.com/books/v1/volumes'
-            response = requests.get(books_url, params={
-                'q': query,
-                'key': GOOGLE_BOOKS_API_KEY,
-                'langRestrict': 'pl',
-                'maxResults': 5
-            })
-            if response.status_code == 200:
-                for item in response.json().get('items', []):
-                    volume_info = item.get('volumeInfo', {})
-                    results.append({
-                        'id': f"book_{item['id']}",
-                        'title': volume_info.get('title', ''),
-                        'type': 'book',
-                        'description': volume_info.get('description', ''),
-                        'poster_path': volume_info.get('imageLinks', {}).get('thumbnail'),
-                        'rating': volume_info.get('averageRating', 0)
-                    })
+    if search_type in ['all', 'book'] and GOOGLE_BOOKS_API_KEY:
+        # Wyszukiwanie książek w Google Books
+        try:
+            books_response = requests.get(
+                'https://www.googleapis.com/books/v1/volumes',
+                params={
+                    'q': query,
+                    'langRestrict': 'pl',
+                    'key': GOOGLE_BOOKS_API_KEY
+                }
+            )
+            books_data = books_response.json()
+            
+            for book in books_data.get('items', []):
+                volume_info = book.get('volumeInfo', {})
+                results.append({
+                    'id': book['id'],
+                    'title': volume_info.get('title', ''),
+                    'type': 'book',
+                    'description': volume_info.get('description', ''),
+                    'poster_path': volume_info.get('imageLinks', {}).get('thumbnail'),
+                    'rating': volume_info.get('averageRating', 0)
+                })
+        except Exception as e:
+            app.logger.error(f'Google Books API error: {str(e)}')
 
-        # Wyszukiwanie gier przez RAWG API
-        if search_type in ['all', 'game']:
-            rawg_url = 'https://api.rawg.io/api/games'
-            response = requests.get(rawg_url, params={
-                'key': RAWG_API_KEY,
-                'search': query,
-                'page_size': 5
-            })
-            if response.status_code == 200:
-                for item in response.json().get('results', []):
-                    results.append({
-                        'id': f"game_{item['id']}",
-                        'title': item['name'],
-                        'type': 'game',
-                        'description': item.get('description', ''),
-                        'poster_path': item.get('background_image'),
-                        'rating': item.get('rating', 0)
-                    })
+    if search_type in ['all', 'game'] and RAWG_API_KEY:
+        # Wyszukiwanie gier w RAWG
+        try:
+            games_response = requests.get(
+                'https://api.rawg.io/api/games',
+                params={
+                    'search': query,
+                    'key': RAWG_API_KEY
+                }
+            )
+            games_data = games_response.json()
+            
+            for game in games_data.get('results', []):
+                results.append({
+                    'id': str(game['id']),
+                    'title': game['name'],
+                    'type': 'game',
+                    'description': game.get('description', ''),
+                    'poster_path': game.get('background_image'),
+                    'rating': game.get('rating', 0)
+                })
+        except Exception as e:
+            app.logger.error(f'RAWG API error: {str(e)}')
 
-        return jsonify({'results': results})
-    except Exception as e:
-        app.logger.error(f'Error searching: {str(e)}')
-        return jsonify({'error': 'Could not perform search'}), 500 
+    return jsonify({'results': results}) 
