@@ -83,7 +83,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 2rem;
+  padding: 1rem;
   background-color: #1a1a1a;
 }
 
@@ -96,23 +96,29 @@
 h1 {
   text-align: center;
   color: #ffffff;
-  margin-bottom: 2rem;
-  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+  padding: 0 1rem;
 }
 
 .search-section {
-  margin: 2rem 0;
+  margin: 1rem 0;
+  padding: 0 1rem;
 }
 
 .search-controls {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   max-width: 800px;
   margin: 0 auto;
 }
 
-input {
+.search-controls input {
   flex: 1;
+  min-width: 200px;
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.75rem;
   font-size: 1rem;
   border: 2px solid #333;
@@ -122,23 +128,25 @@ input {
   transition: all 0.2s ease;
 }
 
-input::placeholder {
+.search-controls input::placeholder {
   color: #888;
 }
 
-input:focus {
+.search-controls input:focus {
   border-color: #42b883;
   outline: none;
   background-color: #333;
 }
 
-select {
+.search-controls select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 120px;
   padding: 0.75rem;
   border: 2px solid #333;
   border-radius: 8px;
   background-color: #2a2a2a;
   color: #ffffff;
-  min-width: 120px;
   cursor: pointer;
   transition: all 0.2s ease;
   appearance: none;
@@ -149,17 +157,20 @@ select {
   padding-right: 2.5rem;
 }
 
-select:focus {
+.search-controls select:focus {
   border-color: #42b883;
   outline: none;
   background-color: #333;
 }
 
-select:hover {
+.search-controls select:hover {
   background-color: #333;
 }
 
-button {
+.search-controls button {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 100px;
   padding: 0.75rem 1.5rem;
   background-color: #42b883;
   color: white;
@@ -171,16 +182,15 @@ button {
   align-items: center;
   gap: 0.5rem;
   transition: all 0.2s ease;
-  min-width: 120px;
   justify-content: center;
 }
 
-button:hover:not(:disabled) {
+.search-controls button:hover:not(:disabled) {
   background-color: #3aa876;
   transform: translateY(-1px);
 }
 
-button:disabled {
+.search-controls button:disabled {
   background-color: #2a2a2a;
   border: 2px solid #333;
   color: #666;
@@ -189,16 +199,21 @@ button:disabled {
 
 .results {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 2rem;
-  padding: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  padding: 0.5rem;
+  width: 100%;
 }
 
 .item-card {
+  display: flex;
+  flex-direction: column;
   border: 2px solid #333;
   border-radius: 12px;
   overflow: hidden;
   background: #2a2a2a;
+  height: 100%;
+  max-width: 100%;
   box-shadow: 0 4px 6px rgba(0,0,0,0.2);
   transition: transform 0.2s;
 }
@@ -212,14 +227,14 @@ button:disabled {
   width: 100%;
   height: 400px;
   object-fit: cover;
+  object-position: center;
 }
 
 .item-details {
-  padding: 1.5rem;
+  padding: 1rem;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  color: #ffffff;
 }
 
 .item-details h3 {
@@ -264,12 +279,12 @@ button:disabled {
 }
 
 .description {
+  max-height: 100px;
+  overflow-y: auto;
+  margin: 0.5rem 0;
   font-size: 0.9rem;
+  line-height: 1.4;
   color: #ffffff;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
   opacity: 0.8;
 }
 
@@ -335,6 +350,56 @@ button:disabled {
   text-align: center;
   padding: 2rem;
   color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .search-container {
+    padding: 0.5rem;
+  }
+
+  .search-controls {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .search-controls input,
+  .search-controls select,
+  .search-controls button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .search-controls button {
+    padding: 0.75rem;
+  }
+
+  h1 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .item-card img {
+    height: 300px;
+  }
+
+  .description {
+    max-height: 80px;
+  }
+
+  .item-card:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .results {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .item-card img {
+    height: 250px;
+  }
 }
 </style>
 

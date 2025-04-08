@@ -20,18 +20,18 @@
         </router-link>
       </div>
 
-      <div v-else class="items-grid">
-        <div v-for="item in items" :key="item.id" class="item-card">
+      <div v-else class="favorites-grid">
+        <div v-for="item in items" :key="item.id" class="favorite-card">
           <img 
             :src="item.poster_path" 
             :alt="item.title"
             @error="handleImageError"
           />
-          <div class="item-details">
+          <div class="card-content">
             <h3>{{ item.title }}</h3>
             <span class="item-type" :class="item.type">{{ getTypeLabel(item.type) }}</span>
             
-            <div class="item-controls">
+            <div class="card-controls">
               <div class="control-group">
                 <label>Status:</label>
                 <select v-model="item.status" @change="handleChange(item)">
@@ -106,59 +106,69 @@
 .favorites-container {
   width: 100%;
   min-height: calc(100vh - 64px);
-  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  background-color: #1a1a1a;
 }
 
 .favorites-content {
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  position: relative;
 }
 
 h1 {
   text-align: center;
   color: #ffffff;
-  margin-bottom: 2rem;
-  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+  padding: 0 1rem;
 }
 
-.items-grid {
+.favorites-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 2rem;
-  padding: 1rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  padding: 0.5rem;
+  width: 100%;
+  margin: 0 auto;
 }
 
-.item-card {
+.favorite-card {
+  display: flex;
+  flex-direction: column;
   border: 2px solid #333;
   border-radius: 12px;
   overflow: hidden;
   background: #2a2a2a;
+  height: 100%;
+  width: 100%;
   box-shadow: 0 4px 6px rgba(0,0,0,0.2);
   transition: transform 0.2s;
 }
 
-.item-card:hover {
+.favorite-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 6px 12px rgba(0,0,0,0.3);
 }
 
-.item-card img {
+.favorite-card img {
   width: 100%;
   height: 400px;
   object-fit: cover;
+  object-position: center;
 }
 
-.item-details {
-  padding: 1.5rem;
+.card-content {
+  padding: 1rem;
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  color: #ffffff;
 }
 
-.item-details h3 {
+.card-content h3 {
   margin: 0;
   font-size: 1.25rem;
   color: #ffffff;
@@ -171,6 +181,7 @@ h1 {
   font-size: 0.875rem;
   font-weight: bold;
   align-self: flex-start;
+  margin: 0.5rem 0;
 }
 
 .item-type.movie {
@@ -188,38 +199,43 @@ h1 {
   color: white;
 }
 
-.item-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
+.description {
+  max-height: 100px;
+  overflow-y: auto;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #ffffff;
+  opacity: 0.8;
 }
 
-.control-group {
+.card-controls {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  margin-top: 1rem;
 }
 
-.control-group label {
-  color: #888;
+.card-controls label {
+  color: #ffffff;
   font-size: 0.9rem;
 }
 
-.control-group.full-width {
+.card-controls select,
+.card-controls input,
+.card-controls textarea {
   width: 100%;
-}
-
-select, input, textarea {
+  box-sizing: border-box;
   padding: 0.75rem;
+  font-size: 1rem;
   border: 2px solid #333;
   border-radius: 8px;
-  background-color: #222;
+  background-color: #2a2a2a;
   color: #ffffff;
-  font-size: 1rem;
   transition: all 0.2s ease;
 }
 
-select {
+.card-controls select {
   appearance: none;
   background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e");
   background-repeat: no-repeat;
@@ -228,68 +244,22 @@ select {
   padding-right: 2.5rem;
 }
 
-select:focus, input:focus, textarea:focus {
+.card-controls select:focus,
+.card-controls input:focus,
+.card-controls textarea:focus {
   border-color: #42b883;
   outline: none;
   background-color: #333;
 }
 
-textarea {
-  resize: vertical;
+.card-controls textarea {
   min-height: 80px;
-}
-
-.item-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 1rem;
-}
-
-.delete-button {
-  padding: 0.75rem 1.5rem;
-  background-color: #dc3545;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: all 0.2s ease;
-}
-
-.delete-button:hover {
-  background-color: #c82333;
-  transform: translateY(-1px);
-}
-
-.save-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background-color: #2a2a2a;
-  border-top: 2px solid #333;
-  padding: 1rem;
-  z-index: 1000;
-}
-
-.save-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  color: #ffffff;
-}
-
-.save-icon {
-  color: #ffc107;
+  resize: vertical;
 }
 
 .save-button {
+  margin-top: 1rem;
+  width: 100%;
   padding: 0.75rem 1.5rem;
   background-color: #42b883;
   color: white;
@@ -299,6 +269,7 @@ textarea {
   font-weight: bold;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   transition: all 0.2s ease;
 }
@@ -315,51 +286,29 @@ textarea {
   cursor: not-allowed;
 }
 
-.save-button.saving {
-  position: relative;
-  overflow: hidden;
+.save-button.success {
+  background-color: #4caf50;
 }
 
-.save-button.saving::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
+.delete-button {
   width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.2),
-    transparent
-  );
-  animation: loading 1.5s infinite;
-}
-
-@keyframes loading {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-.success-message {
-  position: fixed;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: #42b883;
+  padding: 0.75rem 1.5rem;
+  background-color: #dc3545;
   color: white;
-  padding: 1rem 2rem;
+  border: none;
   border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  animation: slideUp 0.3s ease-out;
-  z-index: 1000;
+  transition: all 0.2s ease;
 }
 
-@keyframes slideUp {
-  from { transform: translate(-50%, 100%); opacity: 0; }
-  to { transform: translate(-50%, 0); opacity: 1; }
+.delete-button:hover {
+  background-color: #c82333;
+  transform: translateY(-1px);
 }
 
 .loading {
@@ -384,6 +333,32 @@ textarea {
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+.success-message {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #4caf50;
+  color: white;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-weight: bold;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  z-index: 1000;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translate(-50%, 100%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
 }
 
 .error {
@@ -418,6 +393,76 @@ textarea {
 .add-first:hover {
   background-color: #3aa876;
   transform: translateY(-1px);
+}
+
+@media (max-width: 1200px) {
+  .favorites-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .favorites-container {
+    padding: 0.5rem;
+  }
+
+  .favorites-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+  }
+
+  h1 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .favorite-card {
+    margin: 0;
+  }
+
+  .favorite-card img {
+    height: 300px;
+  }
+
+  .description {
+    max-height: 80px;
+  }
+
+  .favorite-card:hover {
+    transform: none;
+  }
+
+  .save-button:hover,
+  .delete-button:hover {
+    transform: none;
+  }
+
+  .card-controls {
+    gap: 0.75rem;
+  }
+
+  .card-controls select,
+  .card-controls input,
+  .card-controls textarea {
+    padding: 0.75rem;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .favorites-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .favorite-card img {
+    height: 250px;
+  }
+
+  .success-message {
+    width: 90%;
+    text-align: center;
+  }
 }
 </style>
 
