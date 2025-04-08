@@ -104,12 +104,13 @@
 
 <style scoped>
 .favorites-container {
+  width: 100%;
   min-height: calc(100vh - 64px);
-  background-color: #1a1a1a;
   padding: 2rem;
 }
 
 .favorites-content {
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
   position: relative;

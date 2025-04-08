@@ -72,6 +72,7 @@
 
 <style scoped>
 .search-container {
+  width: 100%;
   min-height: calc(100vh - 64px);
   display: flex;
   flex-direction: column;
@@ -83,6 +84,7 @@
 .search-content {
   width: 100%;
   max-width: 1200px;
+  margin: 0 auto;
 }
 
 h1 {

@@ -23,11 +23,20 @@ import { RouterLink, RouterView } from 'vue-router'
     </nav>
   </header>
 
-  <RouterView />
+  <main class="main-content">
+    <RouterView />
+  </main>
 </template>
 
 <style>
 @import '@/assets/base.css';
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #1a1a1a;
+}
 
 header {
   background-color: #42b883;
@@ -88,8 +97,12 @@ nav {
   font-size: 20px;
 }
 
-#app {
-  padding-top: 64px;
-  min-height: 100vh;
+.main-content {
+  flex: 1;
+  margin-top: 64px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 </style>
