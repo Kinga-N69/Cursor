@@ -1,5 +1,13 @@
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
+import { useAuthStore } from './stores/auth'
+import { onMounted } from 'vue'
+
+const authStore = useAuthStore()
+
+onMounted(() => {
+  authStore.initialize()
+})
 </script>
 
 <template>
@@ -10,15 +18,32 @@ import { RouterLink, RouterView } from 'vue-router'
           <span class="material-icons logo-icon">play_circle</span>
           <span class="logo-text">Media</span>
         </router-link>
+        
         <div class="nav-links">
-          <router-link to="/" class="nav-link">
-            <span class="material-icons">search</span>
-            <span class="link-text">Wyszukaj</span>
-          </router-link>
-          <router-link to="/favorites" class="nav-link">
-            <span class="material-icons">favorite</span>
-            <span class="link-text">Ulubione</span>
-          </router-link>
+          <template v-if="authStore.isAuthenticated">
+            <router-link to="/" class="nav-link">
+              <span class="material-icons">search</span>
+              <span class="link-text">Wyszukaj</span>
+            </router-link>
+            <router-link to="/favorites" class="nav-link">
+              <span class="material-icons">favorite</span>
+              <span class="link-text">Ulubione</span>
+            </router-link>
+            <button @click="authStore.logout" class="nav-link logout-button">
+              <span class="material-icons">logout</span>
+              <span class="link-text">Wyloguj</span>
+            </button>
+          </template>
+          <template v-else>
+            <router-link to="/login" class="nav-link">
+              <span class="material-icons">login</span>
+              <span class="link-text">Zaloguj</span>
+            </router-link>
+            <router-link to="/register" class="nav-link">
+              <span class="material-icons">person_add</span>
+              <span class="link-text">Zarejestruj</span>
+            </router-link>
+          </template>
         </div>
       </div>
     </nav>
@@ -101,6 +126,10 @@ nav {
   padding: 0.5rem 1rem;
   border-radius: 4px;
   transition: background-color 0.2s;
+  border: none;
+  background: none;
+  font-size: inherit;
+  cursor: pointer;
 }
 
 .nav-link:hover {
@@ -109,6 +138,10 @@ nav {
 
 .nav-link.router-link-active {
   background-color: rgba(255,255,255,0.2);
+}
+
+.logout-button {
+  color: #ff4757;
 }
 
 .material-icons {

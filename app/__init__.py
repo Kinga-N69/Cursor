@@ -4,6 +4,12 @@ from flask_sqlalchemy import SQLAlchemy
 import os
 from dotenv import load_dotenv
 import requests
+from werkzeug.security import generate_password_hash, check_password_hash
+import jwt
+import datetime
+from functools import wraps
+from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, create_access_token
+import logging
 
 load_dotenv()
 
@@ -19,9 +25,17 @@ CORS(app)
 app.config['DEBUG'] = True
 
 # Konfiguracja bazy danych
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///favorites.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///favorites.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
+app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'your-secret-key')
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(days=1)
 db = SQLAlchemy(app)
+jwt = JWTManager(app)
+
+# Konfiguracja logowania
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Model danych
 class FavoriteItem(db.Model):
@@ -34,6 +48,32 @@ class FavoriteItem(db.Model):
     rating = db.Column(db.Float)
     status = db.Column(db.String(50))  # watching, completed, plan_to_watch
     notes = db.Column(db.Text)
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(120), nullable=False)
+    favorites = db.relationship('Favorite', backref='user', lazy=True)
+
+    def set_password(self, password):
+        self.password = password
+
+    def check_password(self, password):
+        return self.password == password
+
+class Favorite(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    type = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.Text)
+    external_id = db.Column(db.String(100))
+    poster_path = db.Column(db.String(500))
+    status = db.Column(db.String(50), default='plan_to_watch')
+    rating = db.Column(db.Float)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
 # Tworzenie tabel i dodawanie przykładowych danych
 with app.app_context():
@@ -105,118 +145,116 @@ def static_proxy(path):
         return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/api/favorites', methods=['GET'])
+@jwt_required()
 def get_favorites():
-    try:
-        items = FavoriteItem.query.all()
-        return jsonify([{
-            'id': item.id,
-            'title': item.title,
-            'type': item.type,
-            'description': item.description,
-            'rating': round(item.rating * 2) / 2 if item.rating is not None else None,
-            'status': item.status,
-            'notes': item.notes,
-            'poster_path': item.poster_path,
-            'external_id': item.external_id
-        } for item in items])
-    except Exception as e:
-        app.logger.error(f'Error getting favorites: {str(e)}')
-        return jsonify({'error': 'Could not fetch favorites'}), 500
+    current_user_id = get_jwt_identity()
+    favorites = Favorite.query.filter_by(user_id=current_user_id).all()
+    return jsonify([{
+        'id': f.id,
+        'title': f.title,
+        'type': f.type,
+        'description': f.description,
+        'external_id': f.external_id,
+        'poster_path': f.poster_path,
+        'status': f.status,
+        'rating': f.rating,
+        'notes': f.notes,
+        'created_at': f.created_at.isoformat(),
+        'updated_at': f.updated_at.isoformat()
+    } for f in favorites])
 
 @app.route('/api/favorites', methods=['POST'])
+@jwt_required()
 def add_favorite():
-    try:
-        data = request.json
-        app.logger.info(f'Attempting to add favorite: {data}')
+    current_user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    if not data or not data.get('title') or not data.get('type'):
+        return jsonify({'error': 'Missing required fields'}), 400
         
-        # Sprawdź czy element już istnieje
-        existing_item = FavoriteItem.query.filter_by(
-            external_id=str(data.get('external_id')),
-            type=data.get('type')
-        ).first()
-        
-        if existing_item:
-            app.logger.info(f'Item already exists: {existing_item.id}')
-            return jsonify({
-                'error': 'Item already exists',
-                'item': {
-                    'id': existing_item.id,
-                    'title': existing_item.title,
-                    'type': existing_item.type,
-                    'description': existing_item.description,
-                    'external_id': existing_item.external_id,
-                    'poster_path': existing_item.poster_path,
-                    'rating': existing_item.rating,
-                    'status': existing_item.status,
-                    'notes': existing_item.notes
-                }
-            }), 409  # Conflict status code
-        
-        new_item = FavoriteItem(**data)
-        db.session.add(new_item)
-        db.session.commit()
-        
-        return jsonify({
-            'id': new_item.id,
-            'title': new_item.title,
-            'type': new_item.type,
-            'description': new_item.description,
-            'external_id': new_item.external_id,
-            'poster_path': new_item.poster_path,
-            'rating': new_item.rating,
-            'status': new_item.status,
-            'notes': new_item.notes
-        }), 201  # Created status code
-    except Exception as e:
-        db.session.rollback()
-        app.logger.error(f'Error adding favorite: {str(e)}')
-        return jsonify({'error': 'Could not add favorite'}), 500
+    favorite = Favorite(
+        user_id=current_user_id,
+        title=data['title'],
+        type=data['type'],
+        description=data.get('description'),
+        external_id=data.get('external_id'),
+        poster_path=data.get('poster_path'),
+        status=data.get('status', 'plan_to_watch'),
+        rating=data.get('rating'),
+        notes=data.get('notes')
+    )
+    
+    db.session.add(favorite)
+    db.session.commit()
+    
+    return jsonify({
+        'id': favorite.id,
+        'title': favorite.title,
+        'type': favorite.type,
+        'description': favorite.description,
+        'external_id': favorite.external_id,
+        'poster_path': favorite.poster_path,
+        'status': favorite.status,
+        'rating': favorite.rating,
+        'notes': favorite.notes,
+        'created_at': favorite.created_at.isoformat(),
+        'updated_at': favorite.updated_at.isoformat()
+    }), 201
 
 @app.route('/api/favorites/<int:item_id>', methods=['PUT'])
+@jwt_required()
 def update_favorite(item_id):
-    try:
-        data = request.json
-        app.logger.info(f'Updating item {item_id} with data: {data}')  # Debug log
+    current_user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    favorite = Favorite.query.filter_by(id=item_id, user_id=current_user_id).first()
+    if not favorite:
+        return jsonify({'error': 'Favorite not found'}), 404
         
-        item = FavoriteItem.query.get_or_404(item_id)
-        
-        # Aktualizacja wszystkich dozwolonych pól
-        allowed_fields = ['title', 'type', 'description', 'external_id', 
-                         'poster_path', 'status', 'rating', 'notes']
-        
-        for field in allowed_fields:
-            if field in data:
-                setattr(item, field, data[field])
+    logger.info(f"Updating favorite {item_id} with data: {data}")
+    
+    allowed_fields = ['title', 'type', 'description', 'external_id', 'poster_path', 'status', 'rating', 'notes']
+    for field in allowed_fields:
+        if field in data:
+            setattr(favorite, field, data[field])
             
+    try:
         db.session.commit()
-        
         return jsonify({
-            'id': item.id,
-            'title': item.title,
-            'type': item.type,
-            'description': item.description,
-            'external_id': item.external_id,
-            'poster_path': item.poster_path,
-            'rating': item.rating,
-            'status': item.status,
-            'notes': item.notes
+            'id': favorite.id,
+            'title': favorite.title,
+            'type': favorite.type,
+            'description': favorite.description,
+            'external_id': favorite.external_id,
+            'poster_path': favorite.poster_path,
+            'status': favorite.status,
+            'rating': favorite.rating,
+            'notes': favorite.notes,
+            'created_at': favorite.created_at.isoformat(),
+            'updated_at': favorite.updated_at.isoformat()
         })
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f'Error updating favorite: {str(e)}')
-        return jsonify({'error': 'Could not update favorite'}), 500
+        logger.error(f"Error updating favorite {item_id}: {str(e)}")
+        return jsonify({'error': 'Failed to update favorite'}), 500
 
 @app.route('/api/favorites/<int:item_id>', methods=['DELETE'])
+@jwt_required()
 def delete_favorite(item_id):
+    current_user_id = get_jwt_identity()
+    
+    favorite = Favorite.query.filter_by(id=item_id, user_id=current_user_id).first()
+    if not favorite:
+        return jsonify({'error': 'Favorite not found'}), 404
+        
     try:
-        item = FavoriteItem.query.get_or_404(item_id)
-        db.session.delete(item)
+        db.session.delete(favorite)
         db.session.commit()
         return '', 204
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f'Error deleting favorite: {str(e)}')
-        return jsonify({'error': 'Could not delete favorite'}), 500
+        logger.error(f"Error deleting favorite {item_id}: {str(e)}")
+        return jsonify({'error': 'Failed to delete favorite'}), 500
 
 @app.route('/api/search', methods=['GET'])
 def search():
@@ -310,4 +348,48 @@ def search():
         except Exception as e:
             app.logger.error(f'RAWG API error: {str(e)}')
 
-    return jsonify({'results': results}) 
+    return jsonify({'results': results})
+
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    
+    if not data or not data.get('username') or not data.get('password'):
+        return jsonify({'error': 'Missing username or password'}), 400
+        
+    if User.query.filter_by(username=data['username']).first():
+        return jsonify({'error': 'Username already exists'}), 400
+        
+    user = User(username=data['username'], password=data['password'])
+    db.session.add(user)
+    db.session.commit()
+    
+    return jsonify({'message': 'User created successfully'}), 201
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    
+    if not data or not data.get('username') or not data.get('password'):
+        return jsonify({'error': 'Missing username or password'}), 400
+        
+    user = User.query.filter_by(username=data['username']).first()
+    
+    if not user or not user.check_password(data['password']):
+        return jsonify({'error': 'Invalid username or password'}), 401
+        
+    access_token = create_access_token(identity=user.id)
+    return jsonify({'token': access_token}), 200
+
+@app.route('/api/auth/me', methods=['GET'])
+@jwt_required()
+def get_current_user():
+    current_user_id = get_jwt_identity()
+    user = User.query.get(current_user_id)
+    return jsonify({
+        'id': user.id,
+        'username': user.username
+    })
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5001) 

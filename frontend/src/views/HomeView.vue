@@ -1,104 +1,258 @@
 <template>
-  <main>
-    <div class="search-container">
-      <div class="search-content">
-        <h1>Wyszukaj filmy, książki i gry</h1>
-        <div class="search-section">
-          <div class="search-controls">
-            <input 
-              v-model="searchQuery" 
-              placeholder="Wpisz tytuł..." 
-              @keyup.enter="search"
-            />
-            <select v-model="searchType">
-              <option value="all">Wszystko</option>
-              <option value="movie">Filmy</option>
-              <option value="book">Książki</option>
-              <option value="game">Gry</option>
-            </select>
-            <button @click="search" :disabled="loading">
-              <span v-if="!loading">
-                <span class="material-icons">search</span>
-                Szukaj
+  <div class="home">
+    <div v-if="!authStore.isAuthenticated" class="auth-message">
+      <h2>Witaj w aplikacji Media!</h2>
+      <p>Zaloguj się, aby móc wyszukiwać i zarządzać swoimi ulubionymi mediami.</p>
+      <div class="auth-buttons">
+        <router-link to="/login" class="auth-button login">
+          <span class="material-icons">login</span>
+          Zaloguj się
+        </router-link>
+        <router-link to="/register" class="auth-button register">
+          <span class="material-icons">person_add</span>
+          Zarejestruj się
+        </router-link>
+      </div>
+    </div>
+
+    <div v-else class="search-container">
+      <div class="search-section">
+        <div class="search-controls">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Wyszukaj filmy, książki, gry..."
+            @keyup.enter="search"
+          />
+          <select v-model="selectedType">
+            <option value="all">Wszystkie</option>
+            <option value="movie">Filmy</option>
+            <option value="book">Książki</option>
+            <option value="game">Gry</option>
+          </select>
+          <button @click="search" :disabled="loading">
+            <span class="material-icons">search</span>
+            {{ loading ? 'Szukam...' : 'Szukaj' }}
+          </button>
+        </div>
+      </div>
+
+      <div v-if="loading" class="loading">
+        <span class="material-icons loading-icon">hourglass_empty</span>
+        Wyszukiwanie...
+      </div>
+
+      <div v-else-if="error" class="error">
+        {{ error }}
+      </div>
+
+      <div v-else-if="searchPerformed && !results.length" class="no-results">
+        Nie znaleziono wyników dla "{{ searchQuery }}"
+      </div>
+
+      <div v-else-if="results.length" class="results">
+        <div v-for="item in results" :key="item.id" class="item-card">
+          <img :src="item.poster_path" :alt="item.title" @error="handleImageError">
+          <div class="item-details">
+            <span :class="['item-type', item.type]">{{ getTypeLabel(item.type) }}</span>
+            <h3>{{ item.title }}</h3>
+            <div class="item-rating" v-if="item.rating">
+              <span class="material-icons star">star</span>
+              {{ item.rating }}
+            </div>
+            <p class="description">{{ item.description }}</p>
+            <button
+              class="add-button"
+              :class="{
+                'success': item.addedToFavorites,
+                'in-favorites': isInFavorites(item)
+              }"
+              @click="addToFavorites(item)"
+              :disabled="isInFavorites(item) || loading"
+            >
+              <span class="material-icons">
+                {{ isInFavorites(item) ? 'favorite' : 'favorite_border' }}
               </span>
-              <span v-else>Szukam...</span>
+              {{ getButtonLabel(item) }}
             </button>
           </div>
         </div>
-
-        <div v-if="loading" class="loading">
-          <div class="spinner"></div>
-          Wyszukiwanie...
-        </div>
-        
-        <div v-else-if="error" class="error">
-          {{ error }}
-        </div>
-        
-        <div v-else-if="searchResults.length > 0" class="results">
-          <div v-for="item in searchResults" :key="item.id" class="item-card">
-            <img 
-              :src="item.poster_path" 
-              :alt="item.title"
-              @error="handleImageError"
-            />
-            <div class="item-details">
-              <h3>{{ item.title }}</h3>
-              <span class="item-type" :class="item.type">{{ getTypeLabel(item.type) }}</span>
-              <div class="item-rating" v-if="item.rating">
-                <span class="star">★</span>
-                {{ item.rating.toFixed(1) }}
-              </div>
-              <p class="description">{{ item.description || 'Brak opisu' }}</p>
-              <button 
-                @click="addToFavorites(item)"
-                :disabled="isAddingToFavorites[item.id] || isInFavorites(item)"
-                :class="{ 
-                  'success': addedToFavorites[item.id],
-                  'in-favorites': isInFavorites(item)
-                }"
-                class="add-button"
-              >
-                <span class="material-icons">
-                  {{ isInFavorites(item) ? 'favorite' : (addedToFavorites[item.id] ? 'check_circle' : 'favorite_border') }}
-                </span>
-                {{ getAddButtonLabel(item) }}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div v-else-if="searchQuery" class="no-results">
-          Nie znaleziono wyników dla "{{ searchQuery }}"
-        </div>
       </div>
     </div>
-  </main>
+  </div>
 </template>
 
-<style scoped>
-.search-container {
-  width: 100%;
-  min-height: calc(100vh - 64px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 1rem;
-  background-color: #1a1a1a;
+<script setup>
+import { ref, computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { useFavoritesStore } from '@/stores/favorites'
+
+const authStore = useAuthStore()
+const favoritesStore = useFavoritesStore()
+
+const searchQuery = ref('')
+const selectedType = ref('all')
+const loading = ref(false)
+const error = ref('')
+const results = ref([])
+const searchPerformed = ref(false)
+
+const getTypeLabel = (type) => {
+  const labels = {
+    movie: 'Film',
+    book: 'Książka',
+    game: 'Gra'
+  }
+  return labels[type] || type
 }
 
-.search-content {
+const handleImageError = (event) => {
+  event.target.src = '/placeholder.jpg'
+}
+
+const isInFavorites = (item) => {
+  return favoritesStore.items.some(favorite => 
+    favorite.external_id === item.id && favorite.type === item.type
+  )
+}
+
+const getButtonLabel = (item) => {
+  if (isInFavorites(item)) return 'W ulubionych'
+  if (item.addedToFavorites) return 'Dodano!'
+  return 'Dodaj do ulubionych'
+}
+
+async function search() {
+  if (!searchQuery.value.trim()) {
+    error.value = 'Wprowadź tekst do wyszukiwania'
+    return
+  }
+
+  loading.value = true
+  error.value = ''
+  searchPerformed.value = true
+
+  try {
+    const response = await fetch(`/api/search?query=${encodeURIComponent(searchQuery.value)}&type=${selectedType.value}`)
+    if (!response.ok) throw new Error('Błąd wyszukiwania')
+    const data = await response.json()
+    results.value = data.results
+  } catch (err) {
+    error.value = 'Wystąpił błąd podczas wyszukiwania'
+    results.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+async function addToFavorites(item) {
+  if (isInFavorites(item)) return
+
+  try {
+    await favoritesStore.addFavorite({
+      title: item.title,
+      type: item.type,
+      description: item.description,
+      external_id: item.id,
+      poster_path: item.poster_path
+    })
+    item.addedToFavorites = true
+    setTimeout(() => {
+      item.addedToFavorites = false
+    }, 2000)
+  } catch (error) {
+    console.error('Error adding to favorites:', error)
+  }
+}
+</script>
+
+<style scoped>
+.home {
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
+  padding: 2rem 1rem;
 }
 
-h1 {
+.auth-message {
   text-align: center;
+  padding: 4rem 1rem;
   color: #ffffff;
-  margin-bottom: 1.5rem;
-  font-size: 1.5rem;
-  padding: 0 1rem;
+}
+
+.auth-message h2 {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: #42b883;
+}
+
+.auth-message p {
+  font-size: 1.2rem;
+  margin-bottom: 2rem;
+  opacity: 0.8;
+}
+
+.auth-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.auth-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.auth-button.login {
+  background-color: #42b883;
+  color: white;
+}
+
+.auth-button.register {
+  background-color: transparent;
+  color: #42b883;
+  border: 2px solid #42b883;
+}
+
+.auth-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.search-container {
+  width: 100%;
+}
+
+.loading-icon {
+  font-size: 2rem !important;
+  animation: spin 1s infinite linear;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error, .no-results {
+  text-align: center;
+  padding: 2rem;
+  color: #ff4757;
+}
+
+.no-results {
+  color: #ffffff;
+  opacity: 0.8;
 }
 
 .search-section {
@@ -326,30 +480,17 @@ h1 {
   gap: 1rem;
 }
 
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #333;
-  border-top: 4px solid #42b883;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
 .error {
   text-align: center;
   padding: 2rem;
-  color: #dc3545;
+  color: #ff4757;
 }
 
 .no-results {
   text-align: center;
   padding: 2rem;
   color: #ffffff;
+  opacity: 0.8;
 }
 
 @media (max-width: 768px) {
@@ -371,11 +512,6 @@ h1 {
 
   .search-controls button {
     padding: 0.75rem;
-  }
-
-  h1 {
-    font-size: 1.25rem;
-    margin-bottom: 1rem;
   }
 
   .item-card img {
@@ -401,125 +537,4 @@ h1 {
     height: 250px;
   }
 }
-</style>
-
-<script setup>
-import { ref, onMounted } from 'vue'
-import { useFavoritesStore } from '../stores/favorites'
-import axios from 'axios'
-
-const searchQuery = ref('')
-const searchType = ref('all')
-const searchResults = ref([])
-const loading = ref(false)
-const error = ref(null)
-const favoritesStore = useFavoritesStore()
-const isAddingToFavorites = ref({})
-const addedToFavorites = ref({})
-
-// Pobierz ulubione przy montowaniu komponentu
-onMounted(() => {
-  favoritesStore.fetchFavorites()
-})
-
-function isInFavorites(item) {
-  console.log('Checking item:', item.id, typeof item.id);
-  console.log('Current favorites:', favoritesStore.items.map(f => ({ id: f.external_id, type: typeof f.external_id })));
-  
-  return favoritesStore.items.some(favorite => {
-    // Konwertuj oba ID do stringów dla pewności
-    const favoriteId = String(favorite.external_id);
-    const itemId = String(item.id);
-    console.log('Comparing:', favoriteId, itemId, favoriteId === itemId);
-    return favoriteId === itemId && favorite.type === item.type;
-  });
-}
-
-function getTypeLabel(type) {
-  const labels = {
-    movie: 'Film',
-    book: 'Książka',
-    game: 'Gra'
-  }
-  return labels[type] || type
-}
-
-function handleImageError(e) {
-  e.target.src = 'https://via.placeholder.com/300x450?text=Brak+obrazka'
-}
-
-function getAddButtonLabel(item) {
-  if (isInFavorites(item)) {
-    return 'Już w ulubionych'
-  }
-  if (isAddingToFavorites.value[item.id]) {
-    return 'Dodawanie...'
-  }
-  if (addedToFavorites.value[item.id]) {
-    return 'Dodano do ulubionych'
-  }
-  return 'Dodaj do ulubionych'
-}
-
-async function search() {
-  if (!searchQuery.value) return
-  
-  loading.value = true
-  error.value = null
-  try {
-    const response = await axios.get('/api/search', {
-      params: {
-        query: searchQuery.value,
-        type: searchType.value
-      }
-    })
-    searchResults.value = response.data.results
-    // Reset status dla nowych wyników
-    isAddingToFavorites.value = {}
-    addedToFavorites.value = {}
-  } catch (err) {
-    error.value = 'Wystąpił błąd podczas wyszukiwania'
-    searchResults.value = []
-  } finally {
-    loading.value = false
-  }
-}
-
-async function addToFavorites(item) {
-  // Sprawdź czy element już jest w ulubionych lub jest w trakcie dodawania
-  if (isInFavorites(item) || isAddingToFavorites.value[item.id]) {
-    return;
-  }
-
-  isAddingToFavorites.value[item.id] = true;
-  try {
-    const result = await favoritesStore.addFavorite({
-      title: item.title,
-      type: item.type,
-      description: item.description,
-      external_id: item.id,
-      poster_path: item.poster_path,
-      rating: item.rating || 0,
-      status: 'plan_to_watch',
-      notes: ''
-    });
-
-    if (result.error) {
-      console.log('Error adding to favorites:', result.error);
-      // Jeśli element już istnieje, oznacz go jako dodany
-      if (result.error === 'Item already exists') {
-        addedToFavorites.value[item.id] = true;
-      }
-    } else {
-      addedToFavorites.value[item.id] = true;
-      setTimeout(() => {
-        addedToFavorites.value[item.id] = false;
-      }, 3000);
-    }
-  } catch (err) {
-    console.error('Error adding to favorites:', err);
-  } finally {
-    isAddingToFavorites.value[item.id] = false;
-  }
-}
-</script> 
+</style> 
