@@ -111,7 +111,7 @@
 </template>
 
 <script>
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
@@ -146,6 +146,22 @@ export default {
 
     const handleImageError = (event) => {
       event.target.src = '/placeholder.jpg'
+    }
+
+    const fetchFavorites = async () => {
+      if (!authStore.isAuthenticated) return
+      
+      loading.value = true
+      error.value = null
+      
+      try {
+        await favoritesStore.fetchFavorites()
+      } catch (err) {
+        error.value = err.message || 'Nie udało się pobrać ulubionych'
+        console.error('Błąd podczas pobierania ulubionych:', err)
+      } finally {
+        loading.value = false
+      }
     }
 
     const saveChanges = async () => {
@@ -210,6 +226,13 @@ export default {
 
     // Dodaj nasłuchiwanie zdarzenia przed opuszczeniem strony
     window.addEventListener('beforeunload', handleBeforeUnload)
+
+    // Pobierz ulubione przy montowaniu komponentu, jeśli użytkownik jest zalogowany
+    onMounted(() => {
+      if (authStore.isAuthenticated) {
+        fetchFavorites()
+      }
+    })
 
     // Usuń nasłuchiwanie przy odmontowaniu komponentu
     onBeforeUnmount(() => {

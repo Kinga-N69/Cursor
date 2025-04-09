@@ -77,12 +77,17 @@ async function login() {
 <style scoped>
 .login-container {
   width: 100%;
-  min-height: calc(100vh - 64px);
+  position: fixed;
+  top: 64px;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
   background-color: #1a1a1a;
+  overflow: hidden;
 }
 
 .login-card {
@@ -192,6 +197,8 @@ button:disabled {
   
   .login-card {
     padding: 1.5rem;
+    max-height: 100%;
+    overflow-y: auto;
   }
 }
 </style> 

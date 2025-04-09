@@ -19,6 +19,11 @@ export const useFavoritesStore = defineStore('favorites', {
       this.loading = true
       this.error = null
       try {
+        const token = localStorage.getItem('token')
+        if (token) {
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        }
+        
         const response = await axios.get('/api/favorites')
         this.items = response.data
       } catch (error) {
@@ -33,6 +38,11 @@ export const useFavoritesStore = defineStore('favorites', {
       this.loading = true
       this.error = null
       try {
+        const token = localStorage.getItem('token')
+        if (token) {
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        }
+        
         const response = await axios.post('/api/favorites', item)
         this.items.push(response.data)
         return response.data
@@ -48,6 +58,11 @@ export const useFavoritesStore = defineStore('favorites', {
       this.loading = true
       this.error = null
       try {
+        const token = localStorage.getItem('token')
+        if (token) {
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        }
+        
         console.log('Updating favorite:', id, data)
         const response = await axios.put(`/api/favorites/${id}`, data)
         const index = this.items.findIndex(item => item.id === id)
@@ -67,6 +82,11 @@ export const useFavoritesStore = defineStore('favorites', {
       this.loading = true
       this.error = null
       try {
+        const token = localStorage.getItem('token')
+        if (token) {
+          axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        }
+        
         await axios.delete(`/api/favorites/${id}`)
         this.items = this.items.filter(item => item.id !== id)
       } catch (error) {
